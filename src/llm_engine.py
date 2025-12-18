@@ -23,11 +23,6 @@ class ModelFactory:
         """
         Universal function to call ANY model (Azure, Claude-Special, or Local)
         """
-        messages = [
-            {"role": "system", "content": system_role},
-            {"role": "user", "content": prompt}
-        ]
-
         print(f"🤖 Calling Model: {model_name}...")
 
         try:
@@ -38,10 +33,14 @@ class ModelFactory:
                     "content-type": "application/json",
                     "anthropic-version": Config.AZURE_ANTHROPIC_VERSION
                 }
+                # Claude uses system as a top-level parameter, not in messages
                 payload = {
                     "model": model_name,
                     "max_tokens": 4096,
-                    "messages": messages
+                    "system": system_role,
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
                 }
                 # Azure Anthropic endpoints usually differ slightly, using requests for raw control
                 response = requests.post(Config.AZURE_ANTHROPIC_ENDPOINT, headers=headers, json=payload)
@@ -50,14 +49,23 @@ class ModelFactory:
                 else:
                     return f"Error Claude: {response.text}"
 
+            # For other models, use standard message format with system role
+            messages = [
+                {"role": "system", "content": system_role},
+                {"role": "user", "content": prompt}
+            ]
+
             # --- ROUTE 2: LOCAL OLLAMA ---
-            elif model_name in [Config.LOCAL_DEEPSEEK, Config.LOCAL_LLAMA, Config.LOCAL_MISTRAL]:
-                response = self.ollama_client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    temperature=temperature
-                )
-                return response.choices[0].message.content
+            if model_name in [Config.LOCAL_DEEPSEEK, Config.LOCAL_LLAMA, Config.LOCAL_MISTRAL]:
+                try:
+                    response = self.ollama_client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temperature
+                    )
+                    return response.choices[0].message.content
+                except Exception as ollama_error:
+                    return f"❌ Local Model Error ({model_name}): Cannot connect to Ollama. Make sure Ollama is running locally at http://localhost:11434. Note: Local models don't work on Streamlit Cloud. Error: {str(ollama_error)}"
 
             # --- ROUTE 3: AZURE OPENAI STANDARD (GPT-5, GROK) ---
             else:

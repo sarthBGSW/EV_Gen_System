@@ -8,20 +8,30 @@ try:
     from src.config import Config
     from src.graph_workflow import EVGraph
     import time
+    import os
 except Exception as e:
     st.error(f"❌ Import Error: {e}")
     st.stop()
+
+# Check if running on Streamlit Cloud (local models won't work there)
+IS_CLOUD = os.getenv("STREAMLIT_SHARING_MODE") is not None or os.getenv("STREAMLIT_CLOUD") is not None
 
 # Sidebar - Model Selection & Config
 with st.sidebar:
     st.title("⚙️ Neural Config")
     st.subheader("Active Agents")
     
-    drafter_model = st.selectbox("Drafting Agent", 
-                                 [Config.MODEL_GPT5, Config.MODEL_CLAUDE, Config.LOCAL_LLAMA])
+    # Only show local models if running locally
+    if IS_CLOUD:
+        drafter_options = [Config.MODEL_GPT5, Config.MODEL_CLAUDE]
+        critic_options = [Config.MODEL_GROK4]
+        st.warning("⚠️ Local models (Llama, DeepSeek) are not available on Streamlit Cloud. Use cloud models only.")
+    else:
+        drafter_options = [Config.MODEL_GPT5, Config.MODEL_CLAUDE, Config.LOCAL_LLAMA]
+        critic_options = [Config.LOCAL_DEEPSEEK, Config.MODEL_GROK4]
     
-    critic_model = st.selectbox("Critique/Logic Agent", 
-                                [Config.LOCAL_DEEPSEEK, Config.MODEL_GROK4])
+    drafter_model = st.selectbox("Drafting Agent", drafter_options)
+    critic_model = st.selectbox("Critique/Logic Agent", critic_options)
     
     iterations = st.slider("Debate Iterations", min_value=1, max_value=5, value=3)
     
